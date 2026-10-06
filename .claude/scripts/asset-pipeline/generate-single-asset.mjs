@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { pathToFileURL } from "node:url";
 import { readdir, rename } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -9,6 +10,7 @@ import {
   HUNYUAN_3D_PROVIDER,
   runHunyuan3D
 } from "./hunyuan-3d.mjs";
+import { HUNYUAN_TENCENT_3D_PROVIDER, runHunyuan3DTencent } from "./hunyuan-3d-tencent.mjs";
 import {
   DEFAULT_MESHY_ANIMATION_ACTION_ID,
   DEFAULT_MESHY_ENABLE_ANIMATION,
@@ -58,7 +60,13 @@ const MODEL_PROVIDER_ALIASES = new Map([
   ["hunyuan-3d", HUNYUAN_3D_PROVIDER],
   ["hunyuan3d-v3", HUNYUAN_3D_PROVIDER],
   ["fal-ai/hunyuan3d-v3/image-to-3d", HUNYUAN_3D_PROVIDER],
-  ["fal-ai/hunyuan-3d/v3.1/pro/image-to-3d", HUNYUAN_3D_PROVIDER]
+  ["fal-ai/hunyuan-3d/v3.1/pro/image-to-3d", HUNYUAN_3D_PROVIDER],
+  ["tencent", HUNYUAN_TENCENT_3D_PROVIDER],
+  ["tencent-hunyuan", HUNYUAN_TENCENT_3D_PROVIDER],
+  ["hunyuan-tencent", HUNYUAN_TENCENT_3D_PROVIDER],
+  ["hunyuan3d-tencent", HUNYUAN_TENCENT_3D_PROVIDER],
+  ["tencent-ai3d", HUNYUAN_TENCENT_3D_PROVIDER],
+  ["tencent-ai3d/hunyuan-to-3d-pro", HUNYUAN_TENCENT_3D_PROVIDER]
 ]);
 
 async function readJsonIfExists(filePath) {
@@ -119,7 +127,7 @@ function resolve3DProvider(value = DEFAULT_3D_PROVIDER) {
   const normalized = String(value || DEFAULT_3D_PROVIDER).trim().toLowerCase();
   const provider = MODEL_PROVIDER_ALIASES.get(normalized);
   if (!provider) {
-    throw new Error(`Unsupported 3D provider "${value}". Use one of: meshy, hunyuan.`);
+    throw new Error(`Unsupported 3D provider "${value}". Use one of: meshy, hunyuan, hunyuan-tencent.`);
   }
   return provider;
 }
@@ -135,6 +143,9 @@ async function run3DProvider(options) {
   const { provider } = options;
   if (provider === HUNYUAN_3D_PROVIDER) {
     return runHunyuan3D(options);
+  }
+  if (provider === HUNYUAN_TENCENT_3D_PROVIDER) {
+    return runHunyuan3DTencent(options);
   }
   if (provider === MESHY_3D_PROVIDER) {
     return runMeshy3D(options);
@@ -362,6 +373,7 @@ export async function generateSingleObject(options) {
     hunyuanEnablePbr = DEFAULT_HUNYUAN_ENABLE_PBR,
     hunyuanGenerateType = DEFAULT_HUNYUAN_GENERATE_TYPE,
     hunyuanPolygonType = DEFAULT_HUNYUAN_POLYGON_TYPE,
+    hunyuanRapid = false,
     meshyTopology = DEFAULT_MESHY_TOPOLOGY,
     meshyTargetPolycount = DEFAULT_MESHY_TARGET_POLYCOUNT,
     meshySymmetryMode = DEFAULT_MESHY_SYMMETRY_MODE,
@@ -529,6 +541,7 @@ export async function generateSingleObject(options) {
             enablePbr: provider === MESHY_3D_PROVIDER ? meshyEnablePbr : hunyuanEnablePbr,
             generateType: hunyuanGenerateType,
             polygonType: hunyuanPolygonType,
+            rapid: hunyuanRapid,
             topology: meshyTopology,
             targetPolycount: meshyTargetPolycount,
             symmetryMode: meshySymmetryMode,
@@ -592,7 +605,7 @@ async function main() {
 
   if (!world || (!objectId && !directImage)) {
     throw new Error(
-      "Usage: node generate-single-asset.mjs --world <world-name> (--object-id <object-id> | --image <path>) --image-edit-prompt <prompt> [--object-name <name>] [--description <text>] [--provider hunyuan|meshy] [--regenerate] [--regenerate-reference] [--reference-only] [--face-count <40000-1500000>] [--generate-type Normal|LowPoly|Geometry] [--polygon-type triangle|quadrilateral] [--target-polycount 30000] [--enable-pbr true|false]"
+      "Usage: node generate-single-asset.mjs --world <world-name> (--object-id <object-id> | --image <path>) --image-edit-prompt <prompt> [--object-name <name>] [--description <text>] [--provider hunyuan|meshy|hunyuan-tencent] [--regenerate] [--regenerate-reference] [--reference-only] [--face-count <40000-1500000>] [--generate-type Normal|LowPoly|Geometry] [--polygon-type triangle|quadrilateral] [--rapid] [--target-polycount 30000] [--enable-pbr true|false]"
     );
   }
 
@@ -612,6 +625,7 @@ async function main() {
     hunyuanEnablePbr: one(flags, "enable-pbr", DEFAULT_HUNYUAN_ENABLE_PBR),
     hunyuanGenerateType: one(flags, "generate-type", DEFAULT_HUNYUAN_GENERATE_TYPE),
     hunyuanPolygonType: one(flags, "polygon-type", DEFAULT_HUNYUAN_POLYGON_TYPE),
+    hunyuanRapid: Boolean(flags.rapid),
     meshyTopology: one(flags, "topology", DEFAULT_MESHY_TOPOLOGY),
     meshyTargetPolycount: one(flags, "target-polycount", DEFAULT_MESHY_TARGET_POLYCOUNT),
     meshySymmetryMode: one(flags, "symmetry-mode", DEFAULT_MESHY_SYMMETRY_MODE),
@@ -628,7 +642,7 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
     console.error(error.message);
     process.exit(1);

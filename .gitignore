@@ -15,5 +15,16 @@ app/.vite/
 # Environment
 .env
 
+# Python (tools/retexture)
+__pycache__/
+*.pyc
+.venv/
+tools/retexture/out/
+
+# Logs / local scratch
+*.log
+pnpm-debug.log*
+
 # OS
 .DS_Store
+Thumbs.db
